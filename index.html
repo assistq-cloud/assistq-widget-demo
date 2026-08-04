@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Chat Widget</title>
+<style>
+  :root {
+    --ink: #14213d;
+    --accent: #e2703a;
+    --bg: #fdfaf6;
+    --bubble-bot: #f1ede6;
+    --bubble-user: #14213d;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: -apple-system, "Segoe UI", Roboto, sans-serif; }
+
+  #launcher {
+    position: fixed; bottom: 20px; right: 20px;
+    width: 60px; height: 60px; border-radius: 50%;
+    background: var(--accent); color: white;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 26px; cursor: pointer; border: none;
+    box-shadow: 0 6px 20px rgba(20,33,61,0.25);
+    z-index: 9999;
+  }
+
+  #panel {
+    position: fixed; bottom: 92px; right: 20px;
+    width: 340px; max-width: 92vw; height: 480px; max-height: 75vh;
+    background: var(--bg); border-radius: 16px;
+    box-shadow: 0 12px 40px rgba(20,33,61,0.25);
+    display: none; flex-direction: column; overflow: hidden;
+    z-index: 9999;
+  }
+  #panel.open { display: flex; }
+
+  #header { background: var(--ink); color: white; padding: 16px; font-weight: 600; font-size: 15px; }
+  #header span { display: block; font-weight: 400; font-size: 12px; opacity: 0.7; margin-top: 2px; }
+
+  #messages { flex: 1; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+  .msg { max-width: 80%; padding: 10px 13px; border-radius: 14px; font-size: 14px; line-height: 1.4; }
+  .msg.bot { background: var(--bubble-bot); color: var(--ink); align-self: flex-start; border-bottom-left-radius: 4px; }
+  .msg.user { background: var(--bubble-user); color: white; align-self: flex-end; border-bottom-right-radius: 4px; }
+  .msg.error { background: #fdecea; color: #a12622; align-self: flex-start; font-family: monospace; font-size: 12px; }
+
+  #inputRow { display: flex; padding: 10px; gap: 8px; border-top: 1px solid #eae4da; }
+  #textInput { flex: 1; border: 1px solid #ddd5c7; border-radius: 20px; padding: 10px 14px; font-size: 14px; outline: none; }
+  #sendBtn { background: var(--accent); color: white; border: none; border-radius: 20px; padding: 0 18px; font-size: 14px; cursor: pointer; }
+  #sendBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+</style>
+</head>
+<body>
+
+<button id="launcher">💬</button>
+
+<div id="panel">
+  <div id="header">
+    Chat with us
+    <span id="subheader">Usually replies in a few seconds</span>
+  </div>
+  <div id="messages"></div>
+  <div id="inputRow">
+    <input id="textInput" type="text" placeholder="Type a message..." />
+    <button id="sendBtn">Send</button>
+  </div>
+</div>
+
+<script>
+// ============ CONFIG — edit these for each client ============
+const CONFIG = {
+  webhookUrl: "https://script.google.com/macros/s/AKfycbyZddoCVD7M1bnjFzmaP_6c_JdLr6T02z-PB_KC82-G1UQDSrVr08JpTo-StU37iGBT/exec",  // must end in /exec
+  businessName: "CoverCraft",
+  greeting: "Hi! 👋This is CoverCraft What's your name?"
+};
+// ================================================================
+
+let conversation = [];
+let knownFields = {};
+let isComplete = false;
+
+const launcher = document.getElementById("launcher");
+const panel = document.getElementById("panel");
+const messagesEl = document.getElementById("messages");
+const textInput = document.getElementById("textInput");
+const sendBtn = document.getElementById("sendBtn");
+
+launcher.addEventListener("click", () => {
+  panel.classList.toggle("open");
+  if (conversation.length === 0) {
+    addMessage("bot", CONFIG.greeting);
+    conversation.push({ role: "assistant", content: CONFIG.greeting });
+  }
+});
+
+sendBtn.addEventListener("click", sendMessage);
+textInput.addEventListener("keydown", (e) => { if (e.key === "Enter") sendMessage(); });
+
+function addMessage(sender, text) {
+  const div = document.createElement("div");
+  div.className = "msg " + sender;
+  div.textContent = text;
+  messagesEl.appendChild(div);
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+  return div;
+}
+
+async function sendMessage() {
+  const text = textInput.value.trim();
+  if (!text || isComplete) return;
+
+  addMessage("user", text);
+  conversation.push({ role: "user", content: text });
+  textInput.value = "";
+  sendBtn.disabled = true;
+
+  const typingEl = addMessage("bot", "...");
+
+  try {
+    const res = await fetch(CONFIG.webhookUrl, {
+      method: "POST",
+      body: JSON.stringify({ action: "chat", messages: conversation, knownFields: knownFields })
+    });
+
+    const rawText = await res.text();
+    let data;
+    try {
+      data = JSON.parse(rawText);
+    } catch (parseErr) {
+      typingEl.remove();
+      addMessage("error", "Backend didn't return JSON. Raw response:\n" + rawText.slice(0, 300));
+      sendBtn.disabled = false;
+      return;
+    }
+
+    if (data.status === "error") {
+      typingEl.remove();
+      addMessage("error", "Backend error: " + data.message);
+      sendBtn.disabled = false;
+      return;
+    }
+
+    typingEl.remove();
+    addMessage("bot", data.reply);
+    conversation.push({ role: "assistant", content: data.reply });
+    knownFields = data.fields || knownFields;
+
+    if (data.complete && !isComplete) {
+      isComplete = true;
+      await submitLead();
+    }
+
+  } catch (err) {
+    typingEl.remove();
+    addMessage("error", "Request failed: " + err.message + " (check the webhookUrl and your internet connection)");
+  }
+
+  sendBtn.disabled = false;
+  textInput.focus();
+}
+
+async function submitLead() {
+  try {
+    const res = await fetch(CONFIG.webhookUrl, {
+      method: "POST",
+      body: JSON.stringify({ action: "submit", fields: knownFields })
+    });
+    const rawText = await res.text();
+    let data;
+    try { data = JSON.parse(rawText); } catch (e) { data = null; }
+
+    if (!data || data.status !== "success") {
+      addMessage("error", "Lead submit failed: " + (data ? data.message : rawText.slice(0, 300)));
+    } else {
+      addMessage("bot", "✅ Saved! Thanks — we'll be in touch shortly.");
+    }
+  } catch (err) {
+    addMessage("error", "Submit request failed: " + err.message);
+  }
+}
+</script>
+
+</body>
+</html>
