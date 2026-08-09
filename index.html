@@ -58,7 +58,7 @@
     opacity: 0.4;
   }
 
-  /* ---- Chat widget (unchanged from before) ---- */
+  /* ---- Chat widget ---- */
   #launcher {
     position: fixed; bottom: 20px; right: 20px;
     width: 60px; height: 60px; border-radius: 50%;
@@ -89,6 +89,13 @@
   #sendBtn { background: var(--accent); color: white; border: none; border-radius: 20px; padding: 0 18px; font-size: 14px; cursor: pointer; }
   #sendBtn:disabled { opacity: 0.5; cursor: not-allowed; }
 
+  .optionsRow { display: flex; flex-wrap: wrap; gap: 8px; padding: 0 14px 10px; }
+  .optionBtn {
+    background: white; color: var(--ink); border: 1.5px solid var(--accent);
+    border-radius: 16px; padding: 7px 14px; font-size: 13px; cursor: pointer;
+  }
+  .optionBtn:hover { background: var(--accent); color: white; }
+
   @media (max-width: 480px) {
     header h1 { font-size: 26px; }
     header { padding: 40px 20px 24px; }
@@ -114,6 +121,7 @@
     <span id="subheader">Usually replies in a few seconds</span>
   </div>
   <div id="messages"></div>
+  <div id="optionsContainer"></div>
   <div id="inputRow">
     <input id="textInput" type="text" placeholder="Type a message..." />
     <button id="sendBtn">Send</button>
@@ -125,17 +133,29 @@
 const CONFIG = {
   webhookUrl: "https://script.google.com/macros/s/AKfycbyZddoCVD7M1bnjFzmaP_6c_JdLr6T02z-PB_KC82-G1UQDSrVr08JpTo-StU37iGBT/exec",  // must end in /exec
   businessName: "ASSISTQ",
-  greeting: "Heyy!👋 Welcome to ASSISTQ. I'm here to help with any questions and connect you with our team. To get started, could I get your name?"
+  greeting: "Welcome to AssistQ. I'm here to help answer your questions about our lead-generation services and connect you with the right person on our team. To get started, could I get your name?",
+
+  // Must be in the SAME ORDER as the backend's CONFIG.questions.
+  // Give a question "options" to show quick-tap buttons instead of typing.
+  // Leave options as null for free-text questions like name/phone.
+  questions: [
+    { key: "name",  options: null },
+    { key: "phone", options: null },
+    { key: "need",  options: ["AI Assistant", "Smart Form", "Selling", "Just browsing"] },
+    { key: "budget", options: ["Under ₹2000", "4000", "5000", "6000"] }
+  ]
 };
 // ================================================================
 
 let conversation = [];
 let knownFields = {};
 let isComplete = false;
+const leadId = "lead_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8);
 
 const launcher = document.getElementById("launcher");
 const panel = document.getElementById("panel");
 const messagesEl = document.getElementById("messages");
+const optionsContainer = document.getElementById("optionsContainer");
 const textInput = document.getElementById("textInput");
 const sendBtn = document.getElementById("sendBtn");
 
@@ -144,10 +164,11 @@ launcher.addEventListener("click", () => {
   if (conversation.length === 0) {
     addMessage("bot", CONFIG.greeting);
     conversation.push({ role: "assistant", content: CONFIG.greeting });
+    showOptionsIfAny();
   }
 });
 
-sendBtn.addEventListener("click", sendMessage);
+sendBtn.addEventListener("click", () => sendMessage());
 textInput.addEventListener("keydown", (e) => { if (e.key === "Enter") sendMessage(); });
 
 function addMessage(sender, text) {
@@ -159,10 +180,28 @@ function addMessage(sender, text) {
   return div;
 }
 
-async function sendMessage() {
-  const text = textInput.value.trim();
+function showOptionsIfAny() {
+  optionsContainer.innerHTML = "";
+  const nextQ = CONFIG.questions.find(q => !knownFields[q.key]);
+  if (!nextQ || !nextQ.options) return;
+
+  const row = document.createElement("div");
+  row.className = "optionsRow";
+  nextQ.options.forEach(opt => {
+    const btn = document.createElement("button");
+    btn.className = "optionBtn";
+    btn.textContent = opt;
+    btn.onclick = () => sendMessage(opt);
+    row.appendChild(btn);
+  });
+  optionsContainer.appendChild(row);
+}
+
+async function sendMessage(optionText) {
+  const text = optionText || textInput.value.trim();
   if (!text || isComplete) return;
 
+  optionsContainer.innerHTML = "";
   addMessage("user", text);
   conversation.push({ role: "user", content: text });
   textInput.value = "";
@@ -173,7 +212,7 @@ async function sendMessage() {
   try {
     const res = await fetch(CONFIG.webhookUrl, {
       method: "POST",
-      body: JSON.stringify({ action: "chat", messages: conversation, knownFields: knownFields })
+      body: JSON.stringify({ action: "chat", leadId: leadId, messages: conversation, knownFields: knownFields })
     });
 
     const rawText = await res.text();
@@ -202,6 +241,8 @@ async function sendMessage() {
     if (data.complete && !isComplete) {
       isComplete = true;
       await submitLead();
+    } else {
+      showOptionsIfAny();
     }
 
   } catch (err) {
@@ -217,7 +258,7 @@ async function submitLead() {
   try {
     const res = await fetch(CONFIG.webhookUrl, {
       method: "POST",
-      body: JSON.stringify({ action: "submit", fields: knownFields })
+      body: JSON.stringify({ action: "submit", leadId: leadId, fields: knownFields })
     });
     const rawText = await res.text();
     let data;
