@@ -346,7 +346,7 @@ const CONTENT = {
 
   // Optional — paste a real photo URL here (property, storefront, team).
   // Leave as "" for no image; falls back safely either way.
-  heroImage: "https://share.google/7Yvb4YjE68myWidlK",
+  heroImage: "",
 
   about: "Horizon Realty has been helping buyers, renters, and investors navigate the Mumbai and Pune property markets for over a decade. We work with a curated set of verified listings, handle the paperwork end-to-end, and stay with you from the first shortlist to the final handover — no pressure, no hidden fees, just honest guidance.",
 
@@ -373,9 +373,9 @@ const CONTENT = {
   // Each listing photo is optional (falls back to a placeholder icon if
   // missing or broken — never shows a visible error).
   listings: [
-    { image: "https://share.google/F5PpnO5ic0zGiq6CP", title: "3BHK Apartment, Sea-Facing", price: "₹1.65 Cr", specs: "1,480 sq.ft · Navi Mumbai · Ready to Move" },
-    { image: "https://share.google/0m5G0SsANRTuAPcE0", title: "2BHK Apartment, Gated Society", price: "₹82 L", specs: "980 sq.ft · Thane West · Under Construction" },
-    { image: "https://share.google/cSgKgowI01ZRWXwd8", title: "4BHK Independent Villa", price: "₹3.4 Cr", specs: "2,850 sq.ft · Pune · Ready to Move" }
+    { image: "", title: "3BHK Apartment, Sea-Facing", price: "₹1.65 Cr", specs: "1,480 sq.ft · Navi Mumbai · Ready to Move" },
+    { image: "", title: "2BHK Apartment, Gated Society", price: "₹82 L", specs: "980 sq.ft · Thane West · Under Construction" },
+    { image: "", title: "4BHK Independent Villa", price: "₹3.4 Cr", specs: "2,850 sq.ft · Pune · Ready to Move" }
   ],
 
   testimonials: [
@@ -497,7 +497,7 @@ function scrollToSection(id) {
 const CONFIG = {
   webhookUrl: "https://script.google.com/macros/s/AKfycbyZddoCVD7M1bnjFzmaP_6c_JdLr6T02z-PB_KC82-G1UQDSrVr08JpTo-StU37iGBT/exec",  // must end in /exec
   businessName: "ASSISTQ",
-  greeting: "greeting: "Hi! 👋 I'm the virtual assistant for AssistQ. I help real estate businesses capture and qualify leads automatically — happy to answer any questions or show you how it works. What's your name?"",
+  greeting: "greeting: Hi! 👋 I'm the virtual assistant for AssistQ. I help real estate businesses capture and qualify leads automatically — happy to answer any questions or show you how it works. What's your name?",
 
   // Must be in the SAME ORDER as the backend's CONFIG.questions.
   // Give a question "options" to show quick-tap buttons instead of typing.
